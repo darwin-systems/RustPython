@@ -1,14 +1,15 @@
 //! Implement python as a virtual machine with bytecodes. This module
 //! implements bytecode structure.
 
+use alloc::collections::BTreeSet;
+use alloc::{borrow::ToOwned, boxed::Box, string::String, vec::Vec};
 use bitflags::bitflags;
 use bstr::ByteSlice;
+use core::fmt;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_complex::Complex64;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
-use std::fmt;
 
 /// Sourcecode location.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -45,7 +46,7 @@ pub trait Constant: Sized {
         bag: &Bag,
     ) -> <Bag::Constant as Constant>::Name {
         bag.make_name_ref(name.as_ref())
-    }
+    
 }
 impl Constant for ConstantData {
     type Name = String;
@@ -729,17 +730,39 @@ impl<C: Constant> CodeObject<C> {
     }
 }
 
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum CodeDeserializeError {
+    Eof,
+    Other,
+}
+impl fmt::Display for CodeDeserializeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Eof => f.write_str("unexpected end of data"),
+            Self::Other => f.write_str("invalid bytecode"),
+        }
+    }
+}
+#[cfg(feature = "std")]
+impl std::error::Error for CodeDeserializeError {}
+
 impl CodeObject<ConstantData> {
     /// Load a code object from bytes
-    pub fn from_bytes(data: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
-        // TODO: PR to lz4_flex to make it not panic
-        if data.len() < 4 {
-            return Err(
-                std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "bad bytecode").into(),
-            );
-        }
-        let raw_bincode = lz4_flex::decompress_size_prepended(data)?;
-        let data = bincode::deserialize(&raw_bincode)?;
+    pub fn from_bytes(data: &[u8]) -> Result<Self, CodeDeserializeError> {
+        use lz4_flex::block::DecompressError;
+        let raw_bincode = lz4_flex::decompress_size_prepended(data).map_err(|e| match e {
+            DecompressError::OutputTooSmall { .. } | DecompressError::ExpectedAnotherByte => {
+                CodeDeserializeError::Eof
+            }
+            _ => CodeDeserializeError::Other,
+        })?;
+        let data = bincode::deserialize(&raw_bincode).map_err(|e| match *e {
+            bincode::ErrorKind::Io(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                CodeDeserializeError::Eof
+            }
+            _ => CodeDeserializeError::Other,
+        })?;
         Ok(data)
     }
 
