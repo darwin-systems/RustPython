@@ -7,8 +7,8 @@
 
 use crate::error::{CompileError, CompileErrorType};
 use crate::symboltable::{make_symbol_table, statements_to_symbol_table, SymbolScope, SymbolTable};
+use crate::IndexSet;
 use alloc::{borrow::ToOwned, boxed::Box, format, string::String, vec, vec::Vec};
-use indexmap::IndexSet;
 use itertools::Itertools;
 use num_complex::Complex64;
 use num_traits::ToPrimitive;
@@ -213,10 +213,10 @@ impl Compiler {
             instructions: Vec::new(),
             locations: Vec::new(),
             constants: Vec::new(),
-            name_cache: IndexSet::new(),
-            varname_cache: IndexSet::new(),
-            cellvar_cache: IndexSet::new(),
-            freevar_cache: IndexSet::new(),
+            name_cache: IndexSet::default(),
+            varname_cache: IndexSet::default(),
+            cellvar_cache: IndexSet::default(),
+            freevar_cache: IndexSet::default(),
             label_map: Vec::new(),
         };
         Compiler {
@@ -274,8 +274,8 @@ impl Compiler {
             instructions: Vec::new(),
             locations: Vec::new(),
             constants: Vec::new(),
-            name_cache: IndexSet::new(),
-            varname_cache: IndexSet::new(),
+            name_cache: IndexSet::default(),
+            varname_cache: IndexSet::default(),
             cellvar_cache,
             freevar_cache,
             label_map: Vec::new(),
