@@ -67,7 +67,9 @@ impl Coro {
     where
         F: FnOnce(FrameRef) -> PyResult<ExecutionResult>,
     {
-        self.running.store(true);
+        if self.running.compare_exchange(false, true).is_err() {
+            return Err(vm.new_value_error(format!("{} already executing", self.variant.name())));
+        }
         let curr_exception_stack_len = vm.exceptions.borrow().len();
         vm.exceptions
             .borrow_mut()
@@ -89,12 +91,16 @@ impl Coro {
         if self.closed.load() {
             return Err(vm.new_exception_empty(self.variant.stop_iteration(vm)));
         }
-        if !self.started.load() && !vm.is_none(&value) {
+        let value = if self.started.load() {
+            Some(value)
+        } else if !vm.is_none(&value) {
             return Err(vm.new_type_error(format!(
                 "can't send non-None value to a just-started {}",
                 self.variant.name()
             )));
-        }
+        } else {
+            None
+        };
         let result = self.run_with_context(vm, |f| f.resume(value, vm));
         self.maybe_close(&result);
         match result {

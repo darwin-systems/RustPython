@@ -254,11 +254,13 @@ impl FrameRef {
 
     pub(crate) fn resume(
         &self,
-        value: PyObjectRef,
+        value: Option<PyObjectRef>,
         vm: &VirtualMachine,
     ) -> PyResult<ExecutionResult> {
         self.with_exec(|mut exec| {
-            exec.push_value(value);
+            if let Some(value) = value {
+                exec.push_value(value)
+            }
             exec.run(vm)
         })
     }

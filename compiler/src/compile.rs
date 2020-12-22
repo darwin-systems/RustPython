@@ -2169,14 +2169,13 @@ impl Compiler {
         );
         let arg0 = self.varname(".0");
 
+        // if this is a generator expression, we need to insert a LoadConst(None) before we return;
+        // the other kinds load their collection types below
         let is_genexpr = matches!(kind, ast::ComprehensionKind::GeneratorExpression { .. });
 
         // Create empty object of proper type:
         match kind {
-            ast::ComprehensionKind::GeneratorExpression { .. } => {
-                // pop the None that was passed to kickstart the generator
-                self.emit(Instruction::Pop);
-            }
+            ast::ComprehensionKind::GeneratorExpression { .. } => {}
             ast::ComprehensionKind::List { .. } => {
                 self.emit(Instruction::BuildList {
                     size: 0,
